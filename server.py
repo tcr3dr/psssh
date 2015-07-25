@@ -265,6 +265,14 @@ def tcp(role, port):
 
 (inq, outq) = tcp('server', 2266)
 
+from subprocess import Popen
+import os
+import sys
+
+curpath = os.path.dirname(os.path.realpath(__file__))
+
+p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'server.ps1'], cwd=curpath, shell=True)
+
 # now connect
 try:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
