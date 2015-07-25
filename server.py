@@ -306,6 +306,7 @@ try:
     t.add_server_key(host_key)
     server = Server()
     try:
+        t.set_subsystem_handler("sftp", paramiko.SFTPServer)
         t.start_server(server=server)
     except paramiko.SSHException:
         print('*** SSH negotiation failed.')
