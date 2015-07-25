@@ -294,6 +294,7 @@ except Exception as e:
 
 print('Got a connection!')
 
+import stub_sftp
 
 try:
     t = paramiko.Transport(client, gss_kex=DoGSSAPIKeyExchange)
@@ -306,7 +307,7 @@ try:
     t.add_server_key(host_key)
     server = Server()
     try:
-        t.set_subsystem_handler("sftp", paramiko.SFTPServer)
+        t.set_subsystem_handler("sftp", paramiko.SFTPServer, stub_sftp.StubSFTPServer)
         t.start_server(server=server)
     except paramiko.SSHException:
         print('*** SSH negotiation failed.')
