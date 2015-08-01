@@ -72,15 +72,20 @@ class Server (paramiko.ServerInterface):
     def check_channel_exec_request(self, channel, cmd):
         print("Got exec request on channel %s for cmd %s" % (channel, cmd,))
         import base64
-        p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd)], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
-        (stdout, stderr) = p.communicate()
-        print('I got your std right here:', stdout, stderr)
-        p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode('echo hi')], cwd=curpath, shell=True)
-        p.communicate()
-        channel.send(stdout)
-        channel.send(stderr)
-        channel.send_exit_status(0)
-        return True
+        print('hi')
+        try:
+            p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd)], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
+            (stdout, stderr) = p.communicate()
+            print('I got your std right here:', stdout, stderr)
+            p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode('echo hi')], cwd=curpath, shell=True)
+            p.communicate()
+            channel.send(stdout)
+            channel.send(stderr)
+            channel.send_exit_status(0)
+            return True
+        except:
+            print('got an error')
+            return False
     
     def check_auth_gssapi_with_mic(self, username,
                                    gss_authenticated=paramiko.AUTH_FAILED,
