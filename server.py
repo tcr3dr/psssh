@@ -71,7 +71,10 @@ class Server (paramiko.ServerInterface):
 
     def check_channel_exec_request(self, channel, cmd):
         print("Got exec request on channel %s for cmd %s" % (channel, cmd,))
-        channel.send('hello world')
+        p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-Command', '&{' + cmd + '}'], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
+        (stdout, stderr) = p.communicate()
+        channel.send(stdout)
+        channel.send(stderr)
         channel.send_exit_status(0)
         return True
     
