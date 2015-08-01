@@ -28,6 +28,8 @@ from threading import Thread
 from Queue import Queue, Empty
 import traceback
 
+from subprocess import PIPE
+
 import paramiko
 from paramiko.py3compat import b, u, decodebytes
 
