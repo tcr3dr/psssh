@@ -68,6 +68,12 @@ class Server (paramiko.ServerInterface):
         if (username == 'robey') and (key == self.good_pub_key):
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
+
+    def check_channel_exec_request(self, channel, cmd):
+        print("Got exec request on channel %s for cmd %s" % (channel, cmd,))
+        channel.send('hello world')
+        channel.send_exit_status(0)
+        return True
     
     def check_auth_gssapi_with_mic(self, username,
                                    gss_authenticated=paramiko.AUTH_FAILED,
