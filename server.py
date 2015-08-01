@@ -83,8 +83,8 @@ class Server (paramiko.ServerInterface):
             channel.send(stderr)
             channel.send_exit_status(0)
             return True
-        except:
-            print('got an error')
+        except Exception as e:
+            print('got an error', e)
             return False
     
     def check_auth_gssapi_with_mic(self, username,
