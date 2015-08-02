@@ -43,6 +43,8 @@ from paramiko.py3compat import b, u, decodebytes
 
 import weakref
 
+curpath = os.path.dirname(os.path.realpath(__file__))
+
 # setup logging
 paramiko.util.log_to_file('demo_server.log')
 
@@ -305,7 +307,6 @@ def channel_shell(chan):
     f = chan.makefile('rU')
 
     (inq, outq) = tcp('server', 2266)
-    curpath = os.path.dirname(os.path.realpath(__file__))
     p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'server.ps1'], cwd=curpath, shell=True)
 
     def outer():
