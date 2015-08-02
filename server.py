@@ -328,13 +328,16 @@ def server_handler(chan):
         print('*** Client never asked for anything.')
         chan.close()
 
-    if event_type == 'shell':
-        channel_shell(chan)
-    elif event_type == 'exec':
-        (cmd,) = args
-        channel_exec(chan, cmd)
-    else:
-        chan.close()
+    try:
+        if event_type == 'shell':
+            channel_shell(chan)
+        elif event_type == 'exec':
+            (cmd,) = args
+            channel_exec(chan, cmd)
+    except:
+        traceback.print_exc()
+    
+    chan.close()
 
 def launch_server(client):
     try:
