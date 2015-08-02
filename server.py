@@ -362,13 +362,15 @@ def launch_server(client):
         try:
             t.set_subsystem_handler("sftp", paramiko.SFTPServer, stub_sftp.StubSFTPServer)
             t.start_server(server=server)
-        except paramiko.SSHException:
+        except (EOFError, paramiko.SSHException):
             print('*** SSH negotiation failed.')
-            sys.exit(1)
+            t.close()
+            return
 
         # wait for channels
         while True:
             chan = t.accept(timeout=1e3)
+            print('acceptin')
             if chan:
                 spawn(server_handler, chan)
                 break
@@ -401,6 +403,7 @@ try:
     while True:
         try:
             client, addr = sock.accept()
+            print('whoop')
         except socket.timeout:
             continue
 
