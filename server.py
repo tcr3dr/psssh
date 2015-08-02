@@ -289,19 +289,11 @@ def tcp(role, port):
 
 def channel_exec(chan, cmd):
     print("Got exec request on channel %s for cmd %s" % (chan, cmd,))
-    import base64
-    try:
-        p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
-        (stdout, stderr) = p.communicate()
-        chan.send(stdout)
-        chan.send(stderr)
-        chan.send_exit_status(p.returncode)
-        self.ran_exec = True
-        self.event.set()
-        return True
-    except Exception as e:
-        print('got an error', e)
-        return False
+    p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
+    (stdout, stderr) = p.communicate()
+    chan.send(stdout)
+    chan.send(stderr)
+    chan.send_exit_status(p.returncode)
 
 def channel_shell(chan):
     f = chan.makefile('rU')
