@@ -293,8 +293,9 @@ def channel_exec(chan, cmd):
     (stdout, stderr) = p.communicate()
     chan.send(stdout)
     import json
-    print(json.dumps(stderr))
+    print(json.dumps(stderr.split('\r\n')[0]))
     if stderr and '#< CLIXML' == stderr.split('\r\n')[0]:
+        print('hi')
         import lxml.etree
         tree = lxml.etree.fromstring('\r\n'.join(stderr.split('\r\n')[1:]))
         for s in tree.xpath('//S'):
