@@ -292,7 +292,11 @@ def channel_exec(chan, cmd):
     p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-OutputFormat', 'Text', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
     (stdout, stderr) = p.communicate()
     chan.send(stdout)
-    chan.send(stderr)
+    if stderr:
+        import lxml.etree
+        tree = lxml.etree.fromstring(stderr)
+        for s in tree.xpath('//S'):
+            chan.send(s)
     chan.send_exit_status(p.returncode)
 
 def channel_shell(chan):
