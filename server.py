@@ -370,7 +370,6 @@ def launch_server(client):
         # wait for channels
         while True:
             chan = t.accept(timeout=1e3)
-            print('acceptin')
             if chan:
                 spawn(server_handler, chan)
                 break
@@ -402,6 +401,7 @@ try:
     sock.listen(60)
     while True:
         try:
+            print('just')
             client, addr = sock.accept()
             print('whoop')
         except socket.timeout:
