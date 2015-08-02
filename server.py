@@ -292,13 +292,16 @@ def channel_exec(chan, cmd):
     p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-OutputFormat', 'Text', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
     (stdout, stderr) = p.communicate()
     chan.send(stdout)
-    import lxml.etree
-    tree = lxml.etree.fromstring(stderr)
-    for s in tree.xpath('//*[local-name()="S"]'):
-        def encode_replace(match):
-            return unichr(int(match.group(1), 16))
-        line = re.sub(r'_x([0-9A-Fa-f]{4})_', encode_replace, s.text)
-        chan.send(line)
+    import json
+    print(json.dumps(stderr.split('\r\n')[0]))
+    if stderr and '#< CLIXML' == stderr.split('\r\n')[0]:
+        import lxml.etree
+        tree = lxml.etree.fromstring('\r\n'.join(stderr.split('\r\n')[1:])))
+        for s in tree.xpath('//*[local-name()="S"]'):
+            def encode_replace(match):
+                return unichr(int(match.group(1), 16))
+            line = re.sub(r'_x([0-9A-Fa-f]{4})_', encode_replace, s.text)
+            chan.send(line)
     chan.send_exit_status(p.returncode)
 
 def channel_shell(chan):
