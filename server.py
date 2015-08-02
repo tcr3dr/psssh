@@ -401,7 +401,7 @@ try:
     sock.listen(60)
     while True:
         try:
-            print('just')
+            wait_read(sock.fileno())
             client, addr = sock.accept()
             print('whoop')
         except socket.timeout:
