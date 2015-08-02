@@ -296,7 +296,7 @@ def channel_exec(chan, cmd):
     print(json.dumps(stderr.split('\r\n')[0]))
     if stderr and '#< CLIXML' == stderr.split('\r\n')[0]:
         import lxml.etree
-        tree = lxml.etree.fromstring('\r\n'.join(stderr.split('\r\n')[1:])))
+        tree = lxml.etree.fromstring('\r\n'.join(stderr.split('\r\n')[1:]))
         for s in tree.xpath('//*[local-name()="S"]'):
             def encode_replace(match):
                 return unichr(int(match.group(1), 16))
