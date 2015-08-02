@@ -294,9 +294,9 @@ def channel_exec(chan, cmd):
     chan.send(stdout)
     import json
     print(json.dumps(stderr))
-    if stderr and re.match(r'CLIXML', stderr.split('\r')[0]):
+    if stderr and '#< CLIXML' == stderr.split('\r\n')[0]:
         import lxml.etree
-        tree = lxml.etree.fromstring('\r'.join(stderr.split('\r')[1:]))
+        tree = lxml.etree.fromstring('\r\n'.join(stderr.split('\r\n')[1:]))
         for s in tree.xpath('//S'):
             chan.send(s)
     chan.send_exit_status(p.returncode)
