@@ -52,14 +52,13 @@ host_key = paramiko.RSAKey(filename='test_rsa.key')
 print('Read key: ' + u(hexlify(host_key.get_fingerprint())))
 
 
-_chandata = weakref.WeakValueDictionary()
+_chandata = weakref.WeakKeyDictionary()
 def chan_queue(chan):
     try:
         return _chandata[chan]
     except KeyError:
         _chandata[chan] = Queue()
         return _chandata[chan]
-
 
 class Server (paramiko.ServerInterface):
     # 'data' is the output of base64.encodestring(str(key))
