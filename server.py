@@ -125,7 +125,7 @@ class Server (paramiko.ServerInterface):
         return 'gssapi-keyex,gssapi-with-mic,password,publickey'
 
     def check_channel_shell_request(self, chan):
-        chan_queue(chan).put(('shell', ())
+        chan_queue(chan).put(('shell', ()))
         return True
 
     def check_channel_exec_request(self, chan, cmd):
