@@ -27,6 +27,14 @@ import threading
 from threading import Thread
 from Queue import Queue, Empty
 import traceback
+import select
+import re
+
+from subprocess import Popen
+import os
+import sys
+
+import stub_sftp
 
 from subprocess import PIPE
 
@@ -53,8 +61,7 @@ class Server (paramiko.ServerInterface):
     good_pub_key = paramiko.RSAKey(data=decodebytes(data))
 
     def __init__(self):
-        self.event = threading.Event()
-        self.ran_exec = False
+        pass
 
     def check_channel_request(self, kind, chanid):
         if kind == 'session':
@@ -71,22 +78,6 @@ class Server (paramiko.ServerInterface):
         if (username == 'robey') and (key == self.good_pub_key):
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
-
-    def check_channel_exec_request(self, channel, cmd):
-        print("Got exec request on channel %s for cmd %s" % (channel, cmd,))
-        import base64
-        try:
-            p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
-            (stdout, stderr) = p.communicate()
-            channel.send(stdout)
-            channel.send(stderr)
-            channel.send_exit_status(p.returncode)
-            self.ran_exec = True
-            self.event.set()
-            return True
-        except Exception as e:
-            print('got an error', e)
-            return False
     
     def check_auth_gssapi_with_mic(self, username,
                                    gss_authenticated=paramiko.AUTH_FAILED,
@@ -124,18 +115,20 @@ class Server (paramiko.ServerInterface):
     def get_allowed_auths(self, username):
         return 'gssapi-keyex,gssapi-with-mic,password,publickey'
 
-    def check_channel_shell_request(self, channel):
-        self.event.set()
+    def check_channel_shell_request(self, chan):
+        chan.event_queue.put(('shell', ()))
         return True
 
-    def check_channel_pty_request(self, channel, term, width, height, pixelwidth,
-                                  pixelheight, modes):
+    def check_channel_exec_request(self, chan, cmd):
+        chan.event_queue.put(('exec', (cmd)))
         return True
+
+    def check_channel_pty_request(self, chan, term, width, height, pixelwidth,
+                                  pixelheight, modes):
+        return False
 
 
 DoGSSAPIKeyExchange = True
-
-import select
 
 def wait_read(sock):
     while True:
@@ -282,103 +275,127 @@ def tcp(role, port):
     spawn(connectify)
     return (in_queue, out_queue)
 
-(inq, outq) = tcp('server', 2266)
 
-from subprocess import Popen
-import os
-import sys
+def channel_exec(chan, cmd):
+    print("Got exec request on channel %s for cmd %s" % (chan, cmd,))
+    import base64
+    try:
+        p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
+        (stdout, stderr) = p.communicate()
+        chan.send(stdout)
+        chan.send(stderr)
+        chan.send_exit_status(p.returncode)
+        self.ran_exec = True
+        self.event.set()
+        return True
+    except Exception as e:
+        print('got an error', e)
+        return False
 
-curpath = os.path.dirname(os.path.realpath(__file__))
+def channel_shell(chan):
+    f = chan.makefile('rU')
 
-p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'server.ps1'], cwd=curpath, shell=True)
+    (inq, outq) = tcp('server', 2266)
+    curpath = os.path.dirname(os.path.realpath(__file__))
+    p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'server.ps1'], cwd=curpath, shell=True)
+
+    def outer():
+        line = ''
+        while True:
+            inp = f.read(1)
+            chan.send(re.sub(r'\r\n?', '\r\n', inp))
+            line += inp
+            for l in line.split('\r')[:-1]:
+                outq.put(l + '\r\n')
+            line = line.split('\r')[-1]
+
+    spawn(outer)
+
+    while True:
+        try:
+            data = inq.get(timeout=1000)
+        except Empty:
+            continue
+        chan.send(re.sub(r'\r?\n', '\r\n', data))
+
+def server_handler(chan):
+    print('Client authenticated!')
+    try:
+        (event_type, args) = chan.event_queue.get(timeout=60)
+    except Empty:
+        print('*** Client never asked for anything.')
+        chan.close()
+
+    if event_type == 'shell':
+        channel_shell(chan)
+    elif event_type == 'exec':
+        (cmd,) = args 
+        channel_exec(chan, cmd)
+    else:
+        chan.close()
+
+def launch_server(client):
+    try:
+        t = paramiko.Transport(client, gss_kex=DoGSSAPIKeyExchange)
+        t.set_gss_host(socket.getfqdn(""))
+        try:
+            t.load_server_moduli()
+        except:
+            print('(Failed to load moduli -- gex will be unsupported.)')
+            raise
+        t.add_server_key(host_key)
+        server = Server()
+        try:
+            t.set_subsystem_handler("sftp", paramiko.SFTPServer, stub_sftp.StubSFTPServer)
+            t.start_server(server=server)
+        except paramiko.SSHException:
+            print('*** SSH negotiation failed.')
+            sys.exit(1)
+
+        # wait for channels
+        while True:
+            chan = t.accept(timeout=1e3)
+            if chan:
+                chan.event_queue = Queue()
+                spawn(server_handler, chan)
+                break
+
+        # f = chan.makefile('rU')
+        # username = f.readline().strip('\r\n')
+        # chan.send('\r\nI don\'t like you, ' + username + '.\r\n')
+        # chan.close()
+
+    except Exception as e:
+        print('*** Caught exception: ' + str(e.__class__) + ': ' + str(e))
+        traceback.print_exc()
+        try:
+            t.close()
+        except:
+            pass
 
 # now connect
 try:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(('', 2200))
+    sock.bind(('', 2206))
 except Exception as e:
     print('*** Bind failed: ' + str(e))
     traceback.print_exc()
     sys.exit(1)
 
 try:
-    sock.listen(100)
     print('Listening for connection ...')
-    client, addr = sock.accept()
+    while True:
+        try:
+            sock.listen(100)
+        except:
+            continue
+
+        client, addr = sock.accept()
+        print('Got a connection!')
+        spawn(launch_server, client)
+
 except Exception as e:
     print('*** Listen/accept failed: ' + str(e))
     traceback.print_exc()
-    sys.exit(1)
-
-print('Got a connection!')
-
-import stub_sftp
-
-try:
-    t = paramiko.Transport(client, gss_kex=DoGSSAPIKeyExchange)
-    t.set_gss_host(socket.getfqdn(""))
-    try:
-        t.load_server_moduli()
-    except:
-        print('(Failed to load moduli -- gex will be unsupported.)')
-        raise
-    t.add_server_key(host_key)
-    server = Server()
-    try:
-        t.set_subsystem_handler("sftp", paramiko.SFTPServer, stub_sftp.StubSFTPServer)
-        t.start_server(server=server)
-    except paramiko.SSHException:
-        print('*** SSH negotiation failed.')
-        sys.exit(1)
-
-    # wait for auth
-    chan = t.accept(20)
-    if chan is None:
-        print('*** No channel.')
-        sys.exit(1)
-    print('Authenticated!')
-
-    server.event.wait(10)
-    if not server.event.is_set():
-        print('*** Client never asked for a shell.')
-        sys.exit(1)
-
-    if server.ran_exec:
-        chan.close()
-    else:
-        f = chan.makefile('rU')
-
-        import re
-
-        def outer():
-            line = ''
-            while True:
-                inp = f.read(1)
-                chan.send(re.sub(r'\r\n?', '\r\n', inp))
-                line += inp
-                for l in line.split('\r')[:-1]:
-                    outq.put(l + '\r\n')
-                line = line.split('\r')[-1]
-
-        spawn(outer)
-
-        while True:
-            try:
-                data = inq.get(timeout=1000)
-            except Empty:
-                continue
-            chan.send(re.sub(r'\r?\n', '\r\n', data))
-    # f = chan.makefile('rU')
-    # username = f.readline().strip('\r\n')
-    # chan.send('\r\nI don\'t like you, ' + username + '.\r\n')
-    # chan.close()
-
-except Exception as e:
-    print('*** Caught exception: ' + str(e.__class__) + ': ' + str(e))
-    traceback.print_exc()
-    try:
-        t.close()
-    except:
-        pass
     sys.exit(1)
