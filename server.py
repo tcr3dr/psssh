@@ -125,11 +125,11 @@ class Server (paramiko.ServerInterface):
         return 'gssapi-keyex,gssapi-with-mic,password,publickey'
 
     def check_channel_shell_request(self, chan):
-        chan_queue(chan).put(('shell', ()))
+        chan_queue(chan).put(('shell', ())
         return True
 
     def check_channel_exec_request(self, chan, cmd):
-        chan_queue(chan).put(('exec', (cmd)))
+        chan_queue(chan).put(('exec', (cmd,)))
         return True
 
     def check_channel_pty_request(self, chan, term, width, height, pixelwidth,
@@ -338,7 +338,7 @@ def server_handler(chan):
     if event_type == 'shell':
         channel_shell(chan)
     elif event_type == 'exec':
-        (cmd,) = args 
+        (cmd,) = args
         channel_exec(chan, cmd)
     else:
         chan.close()
