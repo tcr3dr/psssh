@@ -80,7 +80,7 @@ class Server (paramiko.ServerInterface):
             (stdout, stderr) = p.communicate()
             channel.send(stdout)
             channel.send(stderr)
-            channel.send_exit_status(1)
+            channel.send_exit_status(p.returncode)
             self.ran_exec = True
             self.event.set()
             return True
