@@ -41,6 +41,7 @@ from subprocess import PIPE
 import paramiko
 from paramiko.py3compat import b, u, decodebytes
 
+import weakref
 
 # setup logging
 paramiko.util.log_to_file('demo_server.log')
@@ -49,6 +50,15 @@ host_key = paramiko.RSAKey(filename='test_rsa.key')
 #host_key = paramiko.DSSKey(filename='test_dss.key')
 
 print('Read key: ' + u(hexlify(host_key.get_fingerprint())))
+
+
+_chandata = weakref.WeakValueDictionary()
+def chan_queue(chan):
+    try:
+        return _chandata[chan]
+    except KeyError:
+        _chandata[chan] = Queue()
+        return _chandata[chan]
 
 
 class Server (paramiko.ServerInterface):
@@ -116,11 +126,11 @@ class Server (paramiko.ServerInterface):
         return 'gssapi-keyex,gssapi-with-mic,password,publickey'
 
     def check_channel_shell_request(self, chan):
-        chan.event_queue.put(('shell', ()))
+        chan_queue(chan).put(('shell', ()))
         return True
 
     def check_channel_exec_request(self, chan, cmd):
-        chan.event_queue.put(('exec', (cmd)))
+        chan_queue(chan).put(('exec', (cmd)))
         return True
 
     def check_channel_pty_request(self, chan, term, width, height, pixelwidth,
@@ -321,7 +331,7 @@ def channel_shell(chan):
 def server_handler(chan):
     print('Client authenticated!')
     try:
-        (event_type, args) = chan.event_queue.get(timeout=60)
+        (event_type, args) = chan_queue(chan).get(timeout=60)
     except Empty:
         print('*** Client never asked for anything.')
         chan.close()
@@ -356,7 +366,6 @@ def launch_server(client):
         while True:
             chan = t.accept(timeout=1e3)
             if chan:
-                chan.event_queue = Queue()
                 spawn(server_handler, chan)
                 break
 
