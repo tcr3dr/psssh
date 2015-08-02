@@ -76,7 +76,7 @@ class Server (paramiko.ServerInterface):
         import base64
         print('hi')
         try:
-            p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf16le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
+            p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
             (stdout, stderr) = p.communicate()
             print('I got your std right here:', stdout, stderr)
             channel.send(stdout)
