@@ -292,9 +292,9 @@ def channel_exec(chan, cmd):
     p = Popen(['PowerShell.exe', '-ExecutionPolicy', 'Bypass', '-OutputFormat', 'Text', '-EncodedCommand', base64.b64encode(cmd.encode('utf-16-le'))], cwd=curpath, shell=True, stdout=PIPE, stderr=PIPE)
     (stdout, stderr) = p.communicate()
     chan.send(stdout)
-    if stderr and stderr.startswith('#< CLIXML'):
+    if stderr and re.match(r'CLIXML', stderr.split('\r')[0])
         import lxml.etree
-        tree = lxml.etree.fromstring(stderr[len('#< CLIXML\r'):])
+        tree = lxml.etree.fromstring('\r'.join(stderr.split('\r')[1:]))
         for s in tree.xpath('//S'):
             chan.send(s)
     chan.send_exit_status(p.returncode)
