@@ -366,12 +366,11 @@ def launch_server(client):
         # chan.close()
 
     except Exception as e:
-        print('*** Caught exception: ' + str(e.__class__) + ': ' + str(e))
-        traceback.print_exc()
         try:
             t.close()
         except:
             pass
+        raise e
 
 # now connect
 try:
@@ -384,14 +383,14 @@ except Exception as e:
     sys.exit(1)
 
 try:
-    print('Listening for connection ...')
+    print('Listening for connections...')
+    sock.listen(60)
     while True:
         try:
-            sock.listen(100)
-        except:
+            client, addr = sock.accept()
+        except socket.timeout:
             continue
 
-        client, addr = sock.accept()
         print('Got a connection!')
         spawn(launch_server, client)
 
