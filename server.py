@@ -54,6 +54,7 @@ class Server (paramiko.ServerInterface):
 
     def __init__(self):
         self.event = threading.Event()
+        self.ran_exec = False
 
     def check_channel_request(self, kind, chanid):
         if kind == 'session':
@@ -79,7 +80,8 @@ class Server (paramiko.ServerInterface):
             (stdout, stderr) = p.communicate()
             channel.send(stdout)
             channel.send(stderr)
-            channel.send_exit_status(0)
+            channel.send_exit_status(1)
+            self.ran_exec = True
             self.event.set()
             return True
         except Exception as e:
@@ -342,32 +344,31 @@ try:
         print('*** Client never asked for a shell.')
         sys.exit(1)
 
-    chan.send('\r\n\r\nWelcome to my dorky little BBS!\r\n\r\n')
-    chan.send('We are on fire all the time!  Hooray!  Candy corn for everyone!\r\n')
-    chan.send('Happy birthday to Robot Dave!\r\n\r\n')
+    if server.ran_exec:
+        chan.close()
+    else:
+        f = chan.makefile('rU')
 
-    f = chan.makefile('rU')
+        import re
 
-    import re
+        def outer():
+            line = ''
+            while True:
+                inp = f.read(1)
+                chan.send(re.sub(r'\r\n?', '\r\n', inp))
+                line += inp
+                for l in line.split('\r')[:-1]:
+                    outq.put(l + '\r\n')
+                line = line.split('\r')[-1]
 
-    def outer():
-        line = ''
+        spawn(outer)
+
         while True:
-            inp = f.read(1)
-            chan.send(re.sub(r'\r\n?', '\r\n', inp))
-            line += inp
-            for l in line.split('\r')[:-1]:
-                outq.put(l + '\r\n')
-            line = line.split('\r')[-1]
-
-    spawn(outer)
-
-    while True:
-        try:
-            data = inq.get(timeout=1000)
-        except Empty:
-            continue
-        chan.send(re.sub(r'\r?\n', '\r\n', data))
+            try:
+                data = inq.get(timeout=1000)
+            except Empty:
+                continue
+            chan.send(re.sub(r'\r?\n', '\r\n', data))
     # f = chan.makefile('rU')
     # username = f.readline().strip('\r\n')
     # chan.send('\r\nI don\'t like you, ' + username + '.\r\n')
